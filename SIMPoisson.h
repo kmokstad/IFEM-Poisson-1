@@ -296,6 +296,8 @@ public:
     Dim::msgLevel = 1;
     this->setMode(SIM::RHS_ONLY);
     bool ok = this->assembleSystem(Vectors(1,solution));
+    if (this->Dim::adm.dd.isPartitioned())
+      this->Dim::adm.allReduce(myReact,MPI_SUM);
     Dim::msgLevel = oldlevel;
     Dim::myEqSys = tmpEqSys;
     prob.setReactionIntegral(nullptr);

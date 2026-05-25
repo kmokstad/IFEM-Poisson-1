@@ -248,10 +248,12 @@ bool SIMPoisson<Dim>::solveStep (TimeStep&)
     this->setMode(SIM::RECOVERY);
 
     // Project the secondary solution onto the splines basis
-    size_t j = 0;
-    for (const SIMoptions::ProjectionMap::value_type& pit : Dim::opt.project)
-      if (!this->project(myProj[j++],mySolVec,pit.first))
+    SIMoptions::ProjectionMap::const_iterator pit = Dim::opt.project.begin();
+    for (size_t i = 0; i < myProj.size() && pit != Dim::opt.project.end(); i++)
+      if (!this->project(myProj[i],mySolVec,pit->first))
         return false;
+      else
+        ++pit;
 
     IFEM::cout << std::endl;
   }
@@ -277,7 +279,6 @@ bool SIMPoisson<Dim>::solveStep (TimeStep&)
 
   return true;
 }
-
 
 
 template<class Dim>
@@ -311,30 +312,27 @@ bool SIMPoisson<Dim>::saveStep (TimeStep&, int& nBlock)
   if (!this->writeGlvS(mySolVec,1,nBlock))
     return false;
 
-  size_t pos = 0;
+  size_t i = 0;
   for (const Kappa& f : mVec)
-    if (f.func && !this->writeGlvF(*f.func, ("kappa" + std::to_string(++pos)).c_str(), 1, nBlock))
+    if (f.func && !this->writeGlvF(*f.func, ("kappa" + std::to_string(++i)).c_str(), 1, nBlock))
       return false;
 
   // Write projected solution fields to VTF-file
-  size_t i = 0;
   int iBlk = 100, iGrad = -1;
   std::string grdName;
-  std::vector<std::string> prefix(Dim::opt.project.size());
-  for (const SIMoptions::ProjectionMap::value_type& pit : Dim::opt.project)
-    if (i >= myProj.size())
-      break;
-    else if (!this->writeGlvP(myProj[i],1,nBlock,iBlk,pit.second.c_str()))
+  SIMoptions::ProjectionMap::const_iterator pit = Dim::opt.project.begin();
+  for (size_t i = 0; i < myProj.size() && pit != Dim::opt.project.end(); i++)
+    if (!this->writeGlvP(myProj[i],1,nBlock,iBlk,pit->second.c_str()))
       return false;
     else
     {
-      iBlk += 10;
-      prefix[i++] = pit.second.c_str();
-      if (iGrad < 0 || pit.first == SIMoptions::GLOBAL)
+      if (iGrad < 0 || pit->first == SIMoptions::GLOBAL)
       {
-        iGrad = i-1;
-        grdName = pit.second + " q";
+        iGrad = i;
+        grdName = pit->second + " q";
       }
+      iBlk += 10;
+      ++pit;
     }
 
   // Write the projected solution gradient vector (heat flux) to VTF-file
@@ -349,7 +347,7 @@ bool SIMPoisson<Dim>::saveStep (TimeStep&, int& nBlock)
       return false;
 
   // Write element norms
-  if (!this->writeGlvN(myNorm,1,nBlock,prefix))
+  if (!this->writeGlvN(myNorm,1,nBlock))
     return false;
 
   return this->writeGlvStep(1,0.0,1);
